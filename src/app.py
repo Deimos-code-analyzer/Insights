@@ -60,6 +60,7 @@ Be specific and reference actual resource names and values from the context.
         # Get AI response
         ai_response = ai_service.generate_text(full_prompt, max_tokens=1500)
         
+        print(f"AI Response: {ai_response}")
         return jsonify({
             'response': ai_response,
             'cluster_context': cluster_context,
@@ -75,6 +76,7 @@ def cluster_status():
     try:
         namespace = request.args.get('namespace', 'code-analyzer')
         context = insight.get_cluster_context(namespace)
+        print(context)
         return jsonify(context)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
