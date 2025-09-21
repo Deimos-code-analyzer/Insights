@@ -30,8 +30,7 @@ class Insight:
             "ingresses": [],
             "replica_sets": [],
             "daemon_sets": [],
-            "stateful_sets": [],
-            "namespaces": []
+            "stateful_sets": []
         }
         
         try:
@@ -51,13 +50,124 @@ class Insight:
             # Get Pods
             pods = self.v1.list_namespaced_pod(namespace=namespace)
             for pod in pods.items:
+                # Container details
+                containers = []
+                for container in pod.spec.containers:
+                    container_info = {
+                        "name": container.name,
+                        "image": container.image,
+                        "ports": [{"container_port": p.container_port, "protocol": p.protocol} for p in (container.ports or [])],
+                        "resources": {
+                            "requests": container.resources.requests if container.resources and container.resources.requests else {},
+                            "limits": container.resources.limits if container.resources and container.resources.limits else {}
+                        },
+                        "env_vars": len(container.env or []),
+                        "volume_mounts": [{"name": vm.name, "mount_path": vm.mount_path} for vm in (container.volume_mounts or [])]
+                    }
+                    containers.append(container_info)
+                
+                # Container statuses
+                container_statuses = []
+                if pod.status.container_statuses:
+                    for status in pod.status.container_statuses:
+                        status_info = {
+                            "name": status.name,
+                            "ready": status.ready,
+                            "restart_count": status.restart_count,
+                            "state": {},
+                            "last_state": {}
+                        }
+                        
+                        # Current state
+                        if status.state.running:
+                            status_info["state"] = {
+                                "status": "running",
+                                "started_at": status.state.running.started_at.isoformat() if status.state.running.started_at else None
+                            }
+                        elif status.state.waiting:
+                            status_info["state"] = {
+                                "status": "waiting",
+                                "reason": status.state.waiting.reason,
+                                "message": status.state.waiting.message
+                            }
+                        elif status.state.terminated:
+                            status_info["state"] = {
+                                "status": "terminated",
+                                "reason": status.state.terminated.reason,
+                                "exit_code": status.state.terminated.exit_code,
+                                "finished_at": status.state.terminated.finished_at.isoformat() if status.state.terminated.finished_at else None
+                            }
+                        
+                        # Last state
+                        if status.last_state and status.last_state.terminated:
+                            status_info["last_state"] = {
+                                "status": "terminated",
+                                "reason": status.last_state.terminated.reason,
+                                "exit_code": status.last_state.terminated.exit_code,
+                                "finished_at": status.last_state.terminated.finished_at.isoformat() if status.last_state.terminated.finished_at else None
+                            }
+                        
+                        container_statuses.append(status_info)
+                
+                # Pod conditions
+                conditions = []
+                if pod.status.conditions:
+                    for condition in pod.status.conditions:
+                        condition_info = {
+                            "type": condition.type,
+                            "status": condition.status,
+                            "reason": condition.reason,
+                            "message": condition.message,
+                            "last_transition_time": condition.last_transition_time.isoformat() if condition.last_transition_time else None
+                        }
+                        conditions.append(condition_info)
+                
+                # Volumes
+                volumes = []
+                if pod.spec.volumes:
+                    for volume in pod.spec.volumes:
+                        volume_info = {
+                            "name": volume.name,
+                            "type": "unknown"
+                        }
+                        
+                        if volume.config_map:
+                            volume_info["type"] = "configMap"
+                            volume_info["config_map_name"] = volume.config_map.name
+                        elif volume.secret:
+                            volume_info["type"] = "secret"
+                            volume_info["secret_name"] = volume.secret.secret_name
+                        elif volume.persistent_volume_claim:
+                            volume_info["type"] = "persistentVolumeClaim"
+                            volume_info["pvc_name"] = volume.persistent_volume_claim.claim_name
+                        elif volume.empty_dir:
+                            volume_info["type"] = "emptyDir"
+                        elif volume.host_path:
+                            volume_info["type"] = "hostPath"
+                            volume_info["host_path"] = volume.host_path.path
+                        
+                        volumes.append(volume_info)
+                
                 pod_info = {
                     "name": pod.metadata.name,
                     "status": pod.status.phase,
                     "ready": sum(1 for c in (pod.status.container_statuses or []) if c.ready),
                     "total_containers": len(pod.spec.containers),
                     "restart_count": sum(c.restart_count for c in (pod.status.container_statuses or [])),
-                    "node": pod.spec.node_name
+                    "node": pod.spec.node_name,
+                    "created": pod.metadata.creation_timestamp.isoformat() if pod.metadata.creation_timestamp else None,
+                    "labels": pod.metadata.labels or {},
+                    "annotations": {k: v for k, v in (pod.metadata.annotations or {}).items() if not k.startswith("kubectl.kubernetes.io")},
+                    "service_account": pod.spec.service_account_name,
+                    "restart_policy": pod.spec.restart_policy,
+                    "dns_policy": pod.spec.dns_policy,
+                    "pod_ip": pod.status.pod_ip,
+                    "host_ip": pod.status.host_ip,
+                    "qos_class": pod.status.qos_class,
+                    "containers": containers,
+                    "container_statuses": container_statuses,
+                    "conditions": conditions,
+                    "volumes": volumes
                 }
                 context["pods"].append(pod_info)
             
@@ -191,16 +301,6 @@ class Insight:
                     "updated_replicas": ss.status.updated_replicas or 0
                 }
                 context["stateful_sets"].append(ss_info)
-            
-            # Get all Namespaces (cluster-wide info)
-            namespaces = self.v1.list_namespace()
-            for ns in namespaces.items:
-                ns_info = {
-                    "name": ns.metadata.name,
-                    "status": ns.status.phase,
-                    "created": ns.metadata.creation_timestamp.isoformat() if ns.metadata.creation_timestamp else None
-                }
-                context["namespaces"].append(ns_info)
             
         except Exception as e:
             context["error"] = str(e)
