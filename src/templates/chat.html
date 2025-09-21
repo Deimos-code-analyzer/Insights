@@ -265,6 +265,7 @@
 
     <script>
         let isLoading = false;
+        let conversationHistory = []; // Track conversation history
 
         function addMessage(content, isUser = false, isError = false) {
             const messagesContainer = document.getElementById('chatMessages');
@@ -293,6 +294,19 @@
             messageDiv.appendChild(contentDiv);
             messagesContainer.appendChild(messageDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            // Add to conversation history (skip initial AI greeting and error messages)
+            if (content && !isError && conversationHistory.length > 0 || isUser) {
+                conversationHistory.push({
+                    role: isUser ? 'user' : 'assistant',
+                    content: content
+                });
+                
+                // Keep only last 8 messages (4 exchanges) for performance
+                if (conversationHistory.length > 8) {
+                    conversationHistory = conversationHistory.slice(-8);
+                }
+            }
         }
 
         function showLoading() {
@@ -344,7 +358,8 @@
                     },
                     body: JSON.stringify({
                         message: message,
-                        namespace: namespace
+                        namespace: namespace,
+                        history: conversationHistory // Send conversation history
                     })
                 });
 

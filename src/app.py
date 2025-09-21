@@ -29,12 +29,21 @@ def chat():
         data = request.get_json()
         user_message = data.get('message', '')
         namespace = data.get('namespace', 'code-analyzer')
+        conversation_history = data.get('history', [])  # Array of previous messages
         
         if not user_message:
             return jsonify({'error': 'Message is required'}), 400
         
         # Get current cluster context
         cluster_context = insight.get_cluster_context(namespace)
+        
+        # Build conversation context if history exists
+        conversation_context = ""
+        if conversation_history:
+            conversation_context = "\n\nPrevious conversation:\n"
+            for msg in conversation_history[-4:]:  # Keep last 4 messages for context
+                role = "User" if msg.get('role') == 'user' else "Assistant"
+                conversation_context += f"{role}: {msg.get('content', '')}\n"
         
         # Create a comprehensive prompt for the AI
         system_context = f"""
@@ -52,7 +61,7 @@ Based on this cluster information, answer the user's question. Provide specific 
 - Recent events and problems
 
 If the user asks about cluster health, analyze the data and provide insights.
-Be specific and reference actual resource names and values from the context.
+Be specific and reference actual resource names and values from the context.{conversation_context}
 """
         
         full_prompt = f"{system_context}\n\nUser Question: {user_message}\n\nAnswer:"
