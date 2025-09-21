@@ -13,6 +13,39 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest bandit pip-audit
+
+      - name: Run Unit Tests
+        run: pytest tests/ --maxfail=1 --disable-warnings --junitxml=pytest-report.xml -q
+
+      - name: Upload Pytest Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report
+          path: pytest-report.xml
+
+      - name: Run Bandit Security Scan
+        run: bandit -r src/ -f html -o bandit-report-backend.html || true
+
+      - name: Upload Bandit Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report-backend
+          path: bandit-report-backend.html
+
+      - name: Run pip-audit for dependency vulnerabilities
+        run: pip-audit -r requirements.txt -f json -o pip-audit-report.json || true
+
+      - name: Upload SCA Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report-backend
+          path: pip-audit-report.json
+
       - name: Set up docker
         uses: docker/setup-buildx-action@v2
 
