@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request
 from kubernetes import client, config
 from flask_cors import CORS
+from insight import Insight
 
 app = Flask(__name__)
 CORS(app)
@@ -9,6 +10,9 @@ CORS(app)
 config.load_incluster_config()
 v1 = client.CoreV1Api()
 apps_v1 = client.AppsV1Api()
+
+# Initialize insight
+insight = Insight()
 
 @app.route("/pods", methods=["GET"])
 def list_pods():
@@ -29,6 +33,12 @@ def list_deployments():
     deployments = apps_v1.list_namespaced_deployment(namespace=namespace)
     deployment_names = [d.metadata.name for d in deployments.items]
     return jsonify({"deployments": deployment_names})
+
+@app.route("/cluster-context", methods=["GET"])
+def get_cluster_context():
+    namespace = request.args.get("namespace", "code-analyzer")
+    context = insight.get_cluster_context(namespace)
+    return jsonify(context)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
