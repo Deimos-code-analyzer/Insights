@@ -12,7 +12,7 @@ CORS(app)
 ai_service = AIService()
 insight = Insight()
 
-@app.route('/')
+@app.route('/aiishere')
 def index():
     """Serve the main chat interface"""
     return render_template('chat.html')
