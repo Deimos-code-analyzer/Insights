@@ -11,10 +11,12 @@ spec:
   - Ingress
   ingress:
   - from:
-    - podSelector:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+      podSelector:
         matchLabels:
           app: ingress-nginx
-          namespace: ingress-nginx
     ports:
     - protocol: TCP
       port: 5000
