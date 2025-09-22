@@ -7,3 +7,4 @@ resources:
   - insight-sa.yaml
   - insight-service.yaml
   - insight-ingress.yaml
+  - insight-netpol.yaml

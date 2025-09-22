@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: insight-deploy-netpol
+  namespace: insight
+spec:
+  podSelector:
+    matchLabels:
+      app: insight-deploy
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ingress-nginx
+          namespace: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 5000
